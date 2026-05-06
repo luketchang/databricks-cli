@@ -78,7 +78,7 @@ Use 'databricks bundle deploy' for full resource deployment.`,
 	cmd.Flags().BoolVar(&f.watch, "watch", false, "watch local file system for changes")
 	cmd.Flags().Var(&f.output, "output", "type of the output format")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "simulate sync execution without making actual changes")
-	cmd.Flags().IntVar(&f.concurrency, "concurrency", 2, "maximum number of concurrent in-flight requests during sync")
+	cmd.Flags().IntVar(&f.concurrency, "concurrency", 5, "maximum number of concurrent in-flight requests during sync")
 	cmd.Flags().IntVar(&f.maxRetries, "max-retries", sync.DefaultMaxRetries, "maximum number of retries on transient gateway errors (HTTP 502/503/504); 0 disables sync-layer retries")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
