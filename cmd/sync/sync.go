@@ -190,7 +190,7 @@ func New() *cobra.Command {
 	cmd.Flags().StringVar(&f.excludeFrom, "exclude-from", "", "file containing patterns to exclude from sync (one pattern per line)")
 	cmd.Flags().StringVar(&f.includeFrom, "include-from", "", "file containing patterns to include to sync (one pattern per line)")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "simulate sync execution without making actual changes")
-	cmd.Flags().IntVar(&f.concurrency, "concurrency", sync.MaxRequestsInFlight, "maximum number of concurrent in-flight requests during sync")
+	cmd.Flags().IntVar(&f.concurrency, "concurrency", 5, "maximum number of concurrent in-flight requests during sync")
 
 	// Wrapper for [root.MustWorkspaceClient] that disables loading authentication configuration from a bundle.
 	mustWorkspaceClient := func(cmd *cobra.Command, args []string) error {
