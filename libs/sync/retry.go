@@ -70,7 +70,7 @@ func retryOnTransient(ctx context.Context, maxRetries int, label string, fn func
 		if attempt == maxRetries {
 			break
 		}
-		log.Debugf(ctx, "sync %s: retrying after transient error (attempt %d/%d): %s",
+		log.Warnf(ctx, "sync %s: retrying after transient error (attempt %d/%d): %s",
 			label, attempt+1, maxRetries, err)
 		select {
 		case <-ctx.Done():
