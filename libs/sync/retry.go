@@ -3,7 +3,9 @@ package sync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/databricks/cli/libs/log"
@@ -64,6 +66,26 @@ func retryOnTransient(ctx context.Context, maxRetries int, label string, fn func
 	var err error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err = fn()
+		if err == nil {
+			return nil
+		}
+
+		// Diagnostic breadcrumb: print every sync error with its concrete Go
+		// type and (when available) HTTP status, regardless of whether we
+		// will retry it. Goes straight to stderr so it is not gated by log
+		// level filters. Helps verify whether transient errors are reaching
+		// this layer in the expected *apierr.APIError shape.
+		var aerr *apierr.APIError
+		if errors.As(err, &aerr) {
+			fmt.Fprintf(os.Stderr,
+				"[sync-retry-debug] %s: error type=%T status=%d msg=%.200q\n",
+				label, err, aerr.StatusCode, aerr.Message)
+		} else {
+			fmt.Fprintf(os.Stderr,
+				"[sync-retry-debug] %s: error type=%T msg=%.200q\n",
+				label, err, err.Error())
+		}
+
 		if !isRetryableSyncError(err) {
 			return err
 		}
