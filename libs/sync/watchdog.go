@@ -19,7 +19,9 @@ func (s *Sync) applyDelete(ctx context.Context, remoteName string) error {
 	s.notifyProgress(ctx, EventActionDelete, remoteName, 0.0)
 
 	if !s.DryRun {
-		err := s.filer.Delete(ctx, remoteName)
+		err := retryOnTransient(ctx, s.MaxRetries, "delete "+remoteName, func() error {
+			return s.filer.Delete(ctx, remoteName)
+		})
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -34,7 +36,9 @@ func (s *Sync) applyRmdir(ctx context.Context, remoteName string) error {
 	s.notifyProgress(ctx, EventActionDelete, remoteName, 0.0)
 
 	if !s.DryRun {
-		err := s.filer.Delete(ctx, remoteName)
+		err := retryOnTransient(ctx, s.MaxRetries, "rmdir "+remoteName, func() error {
+			return s.filer.Delete(ctx, remoteName)
+		})
 		if err != nil {
 			// Directory deletion is opportunistic, so we ignore errors.
 			log.Debugf(ctx, "error removing directory %s: %s", remoteName, err)
@@ -50,7 +54,9 @@ func (s *Sync) applyMkdir(ctx context.Context, localName string) error {
 	s.notifyProgress(ctx, EventActionPut, localName, 0.0)
 
 	if !s.DryRun {
-		err := s.filer.Mkdir(ctx, localName)
+		err := retryOnTransient(ctx, s.MaxRetries, "mkdir "+localName, func() error {
+			return s.filer.Mkdir(ctx, localName)
+		})
 		if err != nil {
 			return err
 		}
@@ -64,16 +70,26 @@ func (s *Sync) applyMkdir(ctx context.Context, localName string) error {
 func (s *Sync) applyPut(ctx context.Context, localName string) error {
 	s.notifyProgress(ctx, EventActionPut, localName, 0.0)
 
+	// Surface a missing/unreadable local file before any work, including in
+	// dry-run, matching pre-retry behaviour.
 	localFile, err := s.LocalRoot.Open(localName)
 	if err != nil {
 		return err
 	}
-
-	defer localFile.Close()
+	localFile.Close()
 
 	if !s.DryRun {
 		opts := []filer.WriteMode{filer.CreateParentDirectories, filer.OverwriteIfExists}
-		err = s.filer.Write(ctx, localName, localFile, opts...)
+		err := retryOnTransient(ctx, s.MaxRetries, "put "+localName, func() error {
+			// Re-open the file each attempt: fs.File is read-only and not
+			// guaranteed to support Seek, and filer.Write consumes the reader.
+			f, err := s.LocalRoot.Open(localName)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			return s.filer.Write(ctx, localName, f, opts...)
+		})
 		if err != nil {
 			return err
 		}

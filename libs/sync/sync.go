@@ -49,6 +49,13 @@ type SyncOptions struct {
 	// is used. Callers (e.g. the --concurrency flag) can set this to tune
 	// throughput against workspace API rate limits.
 	Concurrency int
+
+	// MaxRetries is the number of additional attempts performed by the sync
+	// layer when a filer call returns a transient gateway error (HTTP 502/503/504)
+	// that the SDK does not retry on its own. Total attempts = MaxRetries + 1.
+	// When negative, sync layer retries are disabled. The default is
+	// DefaultMaxRetries.
+	MaxRetries int
 }
 
 type Sync struct {
@@ -106,6 +113,17 @@ func New(ctx context.Context, opts SyncOptions) (*Sync, error) {
 	// Negative values indicate a programming error and are rejected at the flag layer.
 	if opts.Concurrency <= 0 {
 		opts.Concurrency = MaxRequestsInFlight
+	}
+
+	// Normalize MaxRetries: zero (the Go zero value seen by callers that don't
+	// set the field) means "use the default". A negative value disables
+	// sync-layer retries entirely. The flag layer maps a user-supplied 0 to -1
+	// so users can explicitly opt out.
+	switch {
+	case opts.MaxRetries == 0:
+		opts.MaxRetries = DefaultMaxRetries
+	case opts.MaxRetries < 0:
+		opts.MaxRetries = 0
 	}
 
 	// For full sync, we start with an empty snapshot.

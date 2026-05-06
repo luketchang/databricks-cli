@@ -23,6 +23,7 @@ type syncFlags struct {
 	output      flags.Output
 	dryRun      bool
 	concurrency int
+	maxRetries  int
 }
 
 func (f *syncFlags) syncOptionsFromBundle(cmd *cobra.Command, b *bundle.Bundle) (*sync.SyncOptions, error) {
@@ -50,6 +51,7 @@ func (f *syncFlags) syncOptionsFromBundle(cmd *cobra.Command, b *bundle.Bundle) 
 	opts.PollInterval = f.interval
 	opts.DryRun = f.dryRun
 	opts.Concurrency = f.concurrency
+	opts.MaxRetries = sync.MaxRetriesFromFlag(f.maxRetries)
 	return opts, nil
 }
 
@@ -77,10 +79,14 @@ Use 'databricks bundle deploy' for full resource deployment.`,
 	cmd.Flags().Var(&f.output, "output", "type of the output format")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "simulate sync execution without making actual changes")
 	cmd.Flags().IntVar(&f.concurrency, "concurrency", 2, "maximum number of concurrent in-flight requests during sync")
+	cmd.Flags().IntVar(&f.maxRetries, "max-retries", sync.DefaultMaxRetries, "maximum number of retries on transient gateway errors (HTTP 502/503/504); 0 disables sync-layer retries")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if f.concurrency < 1 {
 			return fmt.Errorf("--concurrency must be a positive integer, got %d", f.concurrency)
+		}
+		if f.maxRetries < 0 {
+			return fmt.Errorf("--max-retries must be non-negative, got %d", f.maxRetries)
 		}
 
 		b, err := utils.ProcessBundle(cmd, utils.ProcessOptions{})
